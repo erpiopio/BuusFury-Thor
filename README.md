@@ -145,8 +145,8 @@ Back up your save files before switching ROM variants.
 ### Clone
 
 ```bash
-git clone --recurse-submodules https://github.com/erpiopio/BuusFury-Android.git
-cd BuusFury-Android
+git clone --recurse-submodules https://github.com/erpiopio/BuusFury-Thor.git
+cd BuusFury-Thor
 ```
 
 ### Build
