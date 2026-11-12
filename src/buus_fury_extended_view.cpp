@@ -1,3 +1,7 @@
+#if defined(__ANDROID__)
+#include <android/log.h>
+#include "host_window.h"
+#endif
 #include "buus_fury_extended_view.h"
 
 #include <array>
@@ -15,6 +19,9 @@
 #include "runtime_arm.h"
 #include "runtime_bus_bridge.h"
 
+#if defined(__ANDROID__)
+extern "C" std::uint32_t g_irq_nest_depth;
+#endif
 extern "C" unsigned g_ws_active;
 extern "C" unsigned g_ws_extra_left;
 extern "C" unsigned g_ws_extra_right;
@@ -458,6 +465,22 @@ bool field_object_valid(
         scale_y > 0u && scale_y <= 4096u;
 }
 
+void scan_field_objects(gba::GbaBus* bus, std::uint32_t (&objects)[4]) {
+    for (std::uint32_t& object : objects)
+        object = 0u;
+    for (std::uint32_t offset = 0; offset + 0x4Cu <= 0x40000u;
+         offset += 4u) {
+        const std::uint32_t object = 0x02000000u + offset;
+        if (ewram32(bus, object) != kFieldLayerVtable)
+            continue;
+        const unsigned layer = ewram32(bus, object + 4u) & 0xFFu;
+        if (layer < 4u &&
+            field_object_valid(bus, object, static_cast<int>(layer))) {
+            objects[layer] = object;
+        }
+    }
+}
+
 void resolve_field_objects(gba::GbaBus* bus) {
     bool current = true;
     for (int layer = 0; layer < 4; ++layer)
@@ -474,19 +497,7 @@ void resolve_field_objects(gba::GbaBus* bus) {
         return;
     g_last_scan_frame = g_resolve_frame;
 
-    for (std::uint32_t& object : g_field_objects)
-        object = 0u;
-    for (std::uint32_t offset = 0; offset + 0x4Cu <= 0x40000u;
-         offset += 4u) {
-        const std::uint32_t object = 0x02000000u + offset;
-        if (ewram32(bus, object) != kFieldLayerVtable)
-            continue;
-        const unsigned layer = ewram32(bus, object + 4u) & 0xFFu;
-        if (layer < 4u &&
-            field_object_valid(bus, object, static_cast<int>(layer))) {
-            g_field_objects[layer] = object;
-        }
-    }
+    scan_field_objects(bus, g_field_objects);
 }
 
 // Some Webfoot dialogue/cutscene screens install only BG3 as a field layer,
@@ -496,16 +507,18 @@ void resolve_field_objects(gba::GbaBus* bus) {
 // tears the dialogue panel apart. Keep that scene's BGs in their native
 // 240-pixel viewport; the host margins remain transparent/backdrop-colored.
 // Larger or multi-layer resources continue through normal field expansion.
+bool single_chunk_bg3(gba::GbaBus* bus, const std::uint32_t (&objects)[4]) {
+    if (!objects[3] || objects[0] || objects[1] || objects[2])
+        return false;
+    const std::uint32_t resource = ewram32(bus, objects[3] + 0x08u);
+    return mem8(bus, resource + 0x14u) == 1u &&
+        mem8(bus, resource + 0x15u) == 1u;
+}
+
 bool is_single_chunk_bg3_scene(gba::GbaBus* bus) {
     if (!bus) return false;
     resolve_field_objects(bus);
-    if (!g_field_objects[3] || g_field_objects[0] ||
-        g_field_objects[1] || g_field_objects[2]) {
-        return false;
-    }
-    const std::uint32_t resource = ewram32(bus, g_field_objects[3] + 0x08u);
-    return mem8(bus, resource + 0x14u) == 1u &&
-        mem8(bus, resource + 0x15u) == 1u;
+    return single_chunk_bg3(bus, g_field_objects);
 }
 
 bool is_overworld(gba::GbaBus* bus) {
@@ -974,7 +987,7 @@ extern "C" int buus_fury_obj_x_provider(
         const unsigned tile = attr2 & 0x3FFu;
         const unsigned priority = (attr2 >> 10) & 3u;
         if (tile >= 0x360u && tile < 0x400u && priority == 1u) {
-            *out_x = x - static_cast<int>(g_ws_extra_left);
+            *out_x = x; // Mantener HUD en el area original de 240 px
             return 1;
         }
         *out_x = x;
@@ -1242,6 +1255,7 @@ bool waypoint_patch_read(
 extern "C" int buus_fury_bus_write_override(
     std::uint32_t pc, std::uint32_t address, std::uint32_t width,
     std::uint32_t value, std::uint32_t* out_value) {
+
     (void)pc;
     if (!out_value || !g_turbo_active || width != 4u)
         return 0;
@@ -1262,10 +1276,263 @@ extern "C" int buus_fury_bus_write_override(
     return 1;
 }
 
+#if defined(__ANDROID__)
+bool thor_active_field(gba::GbaBus* bus) {
+    if (!census_field_scene(bus) || (bus->io().read16(0u) & 0x80u) != 0u)
+        return false;
+    // A touch can arrive at native width, where the renderer's field cache
+    // does not advance. Inspect current guest objects once per request.
+    std::uint32_t objects[4];
+    scan_field_objects(bus, objects);
+    return objects[3] && !single_chunk_bg3(bus, objects);
+}
+
+constexpr std::uint32_t kEquipmentState = 0x03001068u;
+constexpr std::uint32_t kEquipmentRecords = 0x03001150u;
+constexpr std::uint32_t kEquipmentCatalog = 0x086F82ECu;
+constexpr std::uint32_t kCharacterRecords = 0x03001560u;
+constexpr std::uint32_t kUnequip = 0x08004544u;
+constexpr std::uint32_t kEquip = 0x080045C8u;
+constexpr std::uint32_t kGetLevel = 0x080135D2u;
+constexpr std::uint32_t kRecalculateEquipment = 0x08013C66u;
+
+std::uint32_t equipment_slot(std::uint32_t character, std::uint32_t category) {
+    return kCharacterRecords + 0x68u * character + 0x3Cu + 4u * category;
+}
+
+// Unequip scans by owner and category. Refuse ambiguous or inconsistent saves
+// before asking the original routine to clear a record.
+int equipment_owned_record(gba::GbaBus* bus, unsigned count, unsigned owner,
+                           unsigned category, unsigned equipped) {
+    int match = -1;
+    for (unsigned i = 0; i < count; ++i) {
+        const std::uint32_t word = mem32(bus, kEquipmentRecords + 4u * i);
+        if ((word >> 28) != owner) continue;
+        const unsigned id = word & 0x0FFFFFFFu;
+        if (id >= 162u) return -2;
+        if (mem8(bus, kEquipmentCatalog + 0x2Cu * id + 0x14u) != category) continue;
+        if (id != equipped || match >= 0) return -2;
+        match = static_cast<int>(i);
+    }
+    return match;
+}
+
+bool thor_equipment_thumb(std::uint32_t entry, const std::array<std::uint32_t, 4>& args,
+                          std::uint32_t* result = nullptr) {
+    constexpr std::uint32_t kReturn = 0xF0000001u;
+    const auto saved_cpu = g_cpu;
+    const auto saved_resume = g_runtime_resume_pc;
+    const auto saved_tail = g_runtime_tail_arg;
+    const auto saved_shadow_cycles = g_runtime_shadow_cycles;
+    const auto depth = runtime_call_stack_depth();
+
+    // This keypad hook runs in the guest's normal mainline, after the
+    // instruction's yield check. Shadow ticks keep IRQs and devices still.
+    g_runtime_shadow_tick = 1u;
+    runtime_call_push_return(kReturn);
+    std::copy(args.begin(), args.end(), &g_cpu.R[0]);
+    g_cpu.R[14] = kReturn;
+    runtime_dispatch_with_exchange(entry | 1u);
+    const bool returned = runtime_call_stack_depth() == depth &&
+                          g_cpu.R[15] == (kReturn & ~1u) &&
+                          g_cpu.R[13] == saved_cpu.R[13];
+    if (result) *result = g_cpu.R[0];
+    if (!returned) runtime_call_should_return(kReturn);
+    g_cpu = saved_cpu;
+    g_runtime_resume_pc = saved_resume;
+    g_runtime_tail_arg = saved_tail;
+    g_runtime_shadow_cycles = saved_shadow_cycles;
+    g_runtime_shadow_tick = 0u;
+    if (!returned)
+        __android_log_print(ANDROID_LOG_ERROR, "BF_EQUIPMENT",
+                            "Original Thumb routine %08x did not return cleanly", entry);
+    return returned;
+}
+
+int apply_thor_equipment_request(const gbarecomp::ThorEquipmentRequest& request) {
+    constexpr int kRejected = 1;
+    constexpr int kRestrictedCharacter = 2;
+    gba::GbaBus* bus = active_bus();
+    const unsigned character = request.character;
+    const unsigned category = request.category;
+    const unsigned id = request.item;
+    const unsigned owner = request.owner;
+    const std::uint32_t character_record = kCharacterRecords + 0x68u * character;
+    const std::uint32_t actor = mem32(bus, kControlledActor);
+    const std::uint32_t sp = g_cpu.R[13];
+    if (!bus || g_irq_nest_depth != 0u || (g_cpu.cpsr & 0x1Fu) != 0x1Fu ||
+        bus->io().halted() || g_force_interp || g_runtime_break_pc ||
+        g_runtime_shadow_tick || runtime_call_stack_depth() >= 960u ||
+        (sp & 3u) || sp < 0x03003400u || sp > 0x03007F00u ||
+        request.state_epoch != static_cast<std::uint32_t>(g_runtime_state_epoch) ||
+        character != mem8(bus, kEquipmentState) || mem32(bus, 0x03001034u) != 0u ||
+        actor < 0x02000000u || actor > 0x0203FFFCu ||
+        mem32(bus, actor) != 0x0804C9F0u || actor != mem32(bus, 0x03001C34u) ||
+        mem16(bus, character_record + 0x16u) == 0u ||
+        mem16(bus, character_record + 0x18u) == 0u || !thor_active_field(bus)) {
+        return kRejected;
+    }
+
+    const unsigned count = mem8(bus, kEquipmentState + 0xE4u);
+    const unsigned default_id = mem32(bus, 0x080555B8u + 4u * category);
+    const std::uint32_t item_info = kEquipmentCatalog + 0x2Cu * id;
+    const std::uint32_t slot = equipment_slot(character, category);
+    const unsigned equipped = mem32(bus, slot);
+    const bool equipping = request.record >= 0;
+    const std::uint32_t entry = equipping ? kEquip : kUnequip;
+    if (count > 250u || id == default_id ||
+        mem8(bus, item_info + 0x14u) != category ||
+        !runtime_has_static_entry(entry, 1) || runtime_force_interp_pc(entry, 1) ||
+        !runtime_has_static_entry(kRecalculateEquipment, 1) ||
+        runtime_force_interp_pc(kRecalculateEquipment, 1)) return kRejected;
+
+    const int equipped_record =
+        equipment_owned_record(bus, count, character + 1u, category, equipped);
+    if (equipped == default_id ? equipped_record != -1 : equipped_record < 0)
+        return kRejected;
+
+    if (!equipping) {
+        if (owner != character + 1u || id != equipped || equipped_record < 0)
+            return kRejected;
+        if (!thor_equipment_thumb(entry, {kEquipmentState, character, category, 0u}) ||
+            mem32(bus, slot) != default_id ||
+            mem32(bus, kEquipmentRecords + 4u * equipped_record) != id)
+            return kRejected;
+    } else {
+        const unsigned record = request.record;
+        if (record >= count || owner == character + 1u ||
+            mem32(bus, kEquipmentRecords + 4u * record) != ((owner << 28) | id))
+            return kRejected;
+
+        // The original menu permits transfers, provided the other owner
+        // actually has this exact inventory record in the matching slot.
+        if (owner != 0u &&
+            (mem32(bus, equipment_slot(owner - 1u, category)) != id ||
+             equipment_owned_record(bus, count, owner, category, id) != request.record))
+            return kRejected;
+
+        const unsigned form = mem8(bus, character_record + 0x14u);
+        if (form >= 54u || (mem8(bus, 0x086B82ECu + 0x18u * form) & 4u))
+            return kRestrictedCharacter;
+        if (!runtime_has_static_entry(kGetLevel, 1) || runtime_force_interp_pc(kGetLevel, 1))
+            return kRejected;
+        std::uint32_t level = 0u;
+        const unsigned required_level = mem8(bus, item_info + 0x15u);
+        if (!thor_equipment_thumb(kGetLevel, {character_record, 0u, 0u, 0u}, &level))
+            return kRejected;
+        if (level < required_level) return static_cast<int>(required_level);
+
+        if (!thor_equipment_thumb(entry, {kEquipmentState, character, record, id}) ||
+            mem32(bus, slot) != id ||
+            mem32(bus, kEquipmentRecords + 4u * record) != (((character + 1u) << 28) | id))
+            return kRejected;
+    }
+
+    // Vanilla refreshes the character's cached attributes and scripted effects
+    // after the slot change. ESTADO and EQUIPO read those same attributes.
+    return thor_equipment_thumb(kRecalculateEquipment, {character_record, 0u, 0u, 0u})
+        ? 0 : kRejected;
+}
+
+void service_thor_equipment_request() {
+    gbarecomp::ThorEquipmentRequest request;
+    if (gbarecomp::thor_take_equipment_request(request))
+        gbarecomp::thor_finish_equipment_request(
+            request.sequence, apply_thor_equipment_request(request));
+}
+
+void service_thor_item_request() {
+    const int item = gbarecomp::thor_take_item_request();
+    if (item < 0)
+        return;
+
+    gba::GbaBus* bus = active_bus();
+    // The original inventory action runs the script for the current hero.
+    // Only accept requests in an active field with the same hero in both the
+    // controller and the script engine, outside another script or an IRQ.
+    if (!bus || g_irq_nest_depth != 0u || (g_cpu.cpsr & 0x1Fu) != 0x1Fu ||
+        mem32(bus, 0x03001034u) != 0u || !thor_active_field(bus)) {
+        __android_log_print(ANDROID_LOG_INFO, "BF_USE_ITEM_BRIDGE",
+                            "IGNORED ID=%d: guest is outside an active field", item);
+        return;
+    }
+
+    const std::uint32_t actor = mem32(bus, kControlledActor);
+    const std::uint32_t character = mem8(bus, 0x03001068u);
+    const std::uint32_t hp_addr = 0x03001576u + character * 0x68u;
+    constexpr std::uint32_t kEffectHandlerOffset = 0x22Cu;
+    if (actor < 0x02000000u || actor > 0x02040000u - kEffectHandlerOffset - 4u ||
+        mem32(bus, actor) != 0x0804C9F0u ||
+        actor != mem32(bus, 0x03001C34u) || character >= 9u ||
+        mem16(bus, hp_addr) == 0u || mem16(bus, hp_addr + 2u) == 0u) {
+        __android_log_print(ANDROID_LOG_INFO, "BF_USE_ITEM_BRIDGE",
+                            "IGNORED ID=%d: no live controlled hero", item);
+        return;
+    }
+
+    const std::uint32_t record = 0x083BD2F8u + static_cast<std::uint32_t>(item) * 0x34u;
+    const std::uint32_t quantity_addr = 0x0300106Au + static_cast<std::uint32_t>(item);
+    const unsigned before = mem8(bus, quantity_addr);
+    const unsigned hp_before = mem16(bus, hp_addr);
+    const std::uint32_t script = mem32(bus, record + 0x30u);
+    if (before == 0u || script < 0x08000000u ||
+        script - 0x08000000u >= bus->rom_size()) {
+        __android_log_print(ANDROID_LOG_INFO, "BF_USE_ITEM_BRIDGE",
+                            "IGNORED ID=%d: no quantity or usable script", item);
+        return;
+    }
+
+    // Item 20 refreshes the hero's current effect handler in 0x0801064C.
+    if (item == 20) {
+        const std::uint32_t handler = mem32(bus, actor + kEffectHandlerOffset);
+        const bool in_ram = (handler >= 0x02000000u && handler <= 0x0203FFFCu) ||
+                            (handler >= 0x03000000u && handler <= 0x03007FFCu);
+        const std::uint32_t vtable = in_ram ? mem32(bus, handler) : 0u;
+        if ((handler & 3u) != 0u || vtable < 0x08000000u ||
+            vtable - 0x08000000u >= bus->rom_size()) {
+            __android_log_print(ANDROID_LOG_INFO, "BF_USE_ITEM_BRIDGE",
+                                "IGNORED ID=%d: effect handler is unavailable", item);
+            return;
+        }
+    }
+
+    // 0x0801E14C is the Thumb routine called by the original Use menu.
+    // It takes the item record in R0. The guest script applies the effect,
+    // updates inventory and plays its own sound. As with the music command,
+    // a synthetic return lets the host resume the interrupted keypad load.
+    constexpr std::uint32_t kUseItem = 0x0801E14Du;
+    constexpr std::uint32_t kItemReturn = 0x03007FEDu;
+    const auto saved_cpu = g_cpu;
+    const auto saved_resume_pc = g_runtime_resume_pc;
+    const auto depth = runtime_call_stack_depth();
+    runtime_call_push_return(kItemReturn);
+    g_cpu.R[0] = record;
+    g_cpu.R[14] = kItemReturn;
+    runtime_dispatch_with_exchange(kUseItem);
+    const bool returned = runtime_call_stack_depth() == depth &&
+                          g_cpu.R[15] == (kItemReturn & ~1u) &&
+                          g_cpu.R[13] == saved_cpu.R[13];
+    if (!returned)
+        runtime_call_should_return(kItemReturn);
+    g_cpu = saved_cpu;
+    g_runtime_resume_pc = saved_resume_pc;
+
+    __android_log_print(returned ? ANDROID_LOG_INFO : ANDROID_LOG_WARN,
+                        "BF_USE_ITEM_BRIDGE",
+                        "%s ID=%d qty=%u->%u HP=%u->%u",
+                        returned ? "RETURNED" : "INTERRUPTED", item,
+                        before, unsigned(mem8(bus, quantity_addr)),
+                        hp_before, unsigned(mem16(bus, hp_addr)));
+}
+#endif
+
 extern "C" int buus_fury_bus_read_override(
     std::uint32_t pc, std::uint32_t address, std::uint32_t width,
     std::uint32_t original, std::uint32_t* out_value) {
     gba::GbaBus* bus = active_bus();
+#if defined(__ANDROID__)
+    thor_item_bus_read_override(pc, address, width, original, out_value);
+#endif
     if (g_waypoint_feature && out_value &&
         waypoint_patch_read(address, width, out_value))
         return 1;
@@ -1354,6 +1621,21 @@ extern "C" int buus_fury_bus_read_override(
 
 }  // namespace
 
+#if defined(__ANDROID__)
+int thor_item_bus_read_override(std::uint32_t pc, std::uint32_t address,
+                               std::uint32_t width, std::uint32_t,
+                               std::uint32_t*) {
+    // The same keypad function is also called at boot and from the STOP
+    // wake-up loop. LR selects the normal per-frame caller.
+    if (pc == 0x0803D4A6u && address == 0x04000130u && width == 2u &&
+        g_cpu.R[14] == 0x0803D829u) {
+        service_thor_item_request();
+        service_thor_equipment_request();
+    }
+    return 0;
+}
+#endif
+
 void install_extended_view(std::uint32_t, std::uint32_t) {
     census_configure();
     for (std::uint32_t& object : g_field_objects)
@@ -1372,6 +1654,7 @@ void install_extended_view(std::uint32_t, std::uint32_t) {
     gba::g_ws_bg_x_provider_layers =
         (1u << 0) | (1u << 1) | (1u << 2) | (1u << 3);
     gba::g_ws_obj_attr_x_provider = &buus_fury_obj_x_provider;
+
     g_runtime_bus_read_override = &buus_fury_bus_read_override;
     g_runtime_bus_write_override = &buus_fury_bus_write_override;
     g_turbo_active = false;

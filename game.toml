@@ -92,6 +92,11 @@ mode = "arm"
 note = "Address-taken IWRAM callback observed during the attract sequence"
 
 [[extra_func]]
+addr = 0x0801E14C
+mode = "thumb"
+note = "Inventory Use action at 0x0801E42E calls this item-effect script wrapper"
+
+[[extra_func]]
 addr = 0x0800419C
 mode = "thumb"
 note = "Address-taken startup callback"
@@ -6798,3 +6803,7 @@ note = "Observed self-heal dispatch miss during full-game TAS replay"
 addr = 0x0801DFCE
 mode = "thumb"
 note = "Observed self-heal dispatch miss during full-game TAS replay"
+[[extra_func]]
+addr = 0x080045C8
+mode = "thumb"
+note = "Buu's Fury equipment: original Equip entry called at 0x0801D4D2"

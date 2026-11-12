@@ -70,3 +70,29 @@ gameplay-selfheal*.json
 Thumbs.db
 __pycache__/
 *.pyc
+
+# Android local configuration, signing material and private build products.
+android/.gradle/
+android/app/.cxx/
+android/local.properties
+android/signing.local.properties
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# Local backup archives and source snapshots.
+/Buu_Fury_ES_assets_Estado_Thor.zip
+/src/buus_fury_extended_view.cpp.pre-*
+
+# Android development backups.
+*.pre-*
+*.bak-*
+*.backup-*
+*.backup
+
+# Empty local placeholder.
+/android/LITERAL
+
+# Real AYN Thor screenshots for GitHub.
+!docs/screenshots/*.png

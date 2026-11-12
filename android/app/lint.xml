@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- SDL is hash-pinned by verifySdlCompatibility. Bluetooth initialization
+         returns before privileged calls because this app declares neither
+         BLUETOOTH nor BLUETOOTH_CONNECT. This does not suppress app code. -->
+    <issue id="MissingPermission">
+        <ignore path="../../gbarecomp/platform/android/third_party/SDL/android-project/app/src/main/java/org/libsdl/app/HIDDeviceBLESteamController.java" />
+        <ignore path="../../gbarecomp/platform/android/third_party/SDL/android-project/app/src/main/java/org/libsdl/app/HIDDeviceManager.java" />
+        <!-- The sole game audio open is playback-only (iscapture=0); no mic
+             permission is requested just to satisfy optional SDL capture code. -->
+        <ignore path="../../gbarecomp/platform/android/third_party/SDL/android-project/app/src/main/java/org/libsdl/app/SDLAudioManager.java" />
+    </issue>
+    <issue id="UnspecifiedRegisterReceiverFlag">
+        <!-- SDL registers via this Activity. ThorGameActivity adds NOT_EXPORTED
+             for the exact custom USB permission filter on API 33+. -->
+        <ignore path="../../gbarecomp/platform/android/third_party/SDL/android-project/app/src/main/java/org/libsdl/app/HIDDeviceManager.java" />
+    </issue>
+</lint>

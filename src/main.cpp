@@ -1,11 +1,18 @@
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#if defined(__ANDROID__)
+// SDLActivity looks up the exported C entry point SDL_main in libmain.so.
+#include <SDL_main.h>
+#endif
+
 #include "buus_fury_extended_view.h"
 #include "runtime.h"
+#include "mobile_platform.h"
 
 #if defined(GBAGAME_RECOMP_UI)
 #include "game_launcher_boot.h"
@@ -183,7 +190,7 @@ void print_usage() {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+static int run_buus_fury(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--help") == 0 ||
             std::strcmp(argv[i], "-h") == 0) {
@@ -215,6 +222,9 @@ int main(int argc, char** argv) {
     opts.max_resize_view_width = 480;
     opts.resize_driven_view = true;
     opts.extended_view_init = &buus_fury::install_extended_view;
+#if defined(__ANDROID__)
+    opts.initial_bus_read_override = &buus_fury::thor_item_bus_read_override;
+#endif
     opts.launcher_expose_widescreen = false;
     opts.launcher_expose_adaptive_view = false;
     opts.launcher_region = "USA";
@@ -229,9 +239,13 @@ int main(int argc, char** argv) {
     opts.rewind_capture_interval_frames = 15;
     opts.autosave_interval_seconds = 30;
     opts.resume_suspend_state_on_launch = true;
-    // Press Start + Select in game to open the runtime menu (cheats, save
-    // states, fast-forward, rewind).
+    // Only intercept Start + Select when the runtime menu is actually linked.
+    // Android's initial Java panel supplies controls without the ImGui menu.
+#if defined(__ANDROID__) && !defined(GBARECOMP_RUNTIME_UI)
+    opts.in_game_menu_start_select = false;
+#else
     opts.in_game_menu_start_select = true;
+#endif
 
     // Startup logos (legal, ATARI, FUNimation/Webfoot) run in Assist Tools
     // fast-forward until the title screen is up: the guest frame sequence is
@@ -260,6 +274,15 @@ int main(int argc, char** argv) {
     opts.edit_field_count = sizeof(kEditFields) / sizeof(kEditFields[0]);
 
     std::vector<std::string> args(argv, argv + argc);
+    gbarecomp::MobileProcessOptions mobile;
+    mobile.game_config = "variants/buus-fury/game.toml";
+    mobile.program_name = "./DragonBallZBuusFuryRecomp";
+    gbarecomp::mobile_prepare_process(args, mobile);
+#if defined(__ANDROID__) && !defined(GBAGAME_RECOMP_UI)
+    // The desktop preboot launcher normally consumes this helper switch.
+    // With that launcher omitted, it must not reach the runtime CLI parser.
+    args.erase(std::remove(args.begin(), args.end(), "--no-launcher"), args.end());
+#endif
 
 #if defined(GBAGAME_RECOMP_UI)
     if (game_launcher_preboot(args, opts)) return 0;
@@ -288,4 +311,8 @@ int main(int argc, char** argv) {
     av.reserve(args.size());
     for (std::string& arg : args) av.push_back(arg.data());
     return gbarecomp::run_game(static_cast<int>(av.size()), av.data(), opts);
+}
+
+int main(int argc, char** argv) {
+    return gbarecomp::mobile_run_with_stack(&run_buus_fury, argc, argv);
 }

@@ -1,211 +1,205 @@
-[![Dragon Ball Z: Buu's Fury Recomp](docs/logo.png)](docs/logo.png)
+<div align="center">
 
-[![Support the project on Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20the%20project-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/novapowers)
+![Dragon Ball Z: Buu's Fury](docs/logo.png)
 
-# Dragon Ball Z: Buu's Fury Recomp
+# Dragon Ball Z: Buu's Fury — Android Dual-Screen
 
-**English** · [Español](README.es.md)
+**Native Android ARM64 port with adaptive widescreen and a dedicated touchscreen companion interface for AYN Thor.**
 
-A native Windows recompilation of *Dragon Ball Z: Buu's Fury* (Game Boy Advance)
-built on the [gbarecomp](https://github.com/mstan/gbarecomp) runtime. The game's
-original ARM code is statically recompiled and linked into a standalone
-executable with its own launcher and mod system. It is a real port, not an
-emulator.
+![Platform](https://img.shields.io/badge/Platform-Android_ARM64-green)
+![Device](https://img.shields.io/badge/Device-AYN_Thor-blue)
+![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-lightgrey)
+![Status](https://img.shields.io/badge/Status-Experimental-orange)
 
-[![Version](https://img.shields.io/badge/version-v0.0.6--WIP-orange?style=flat-square)](../../releases)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0078D6?style=flat-square)](../../releases)
-[![License](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey?style=flat-square)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/novapowers0/DragonBallZBuusFuryRecomp?style=flat-square&color=yellow)](https://github.com/novapowers0/DragonBallZBuusFuryRecomp)
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20me-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white)](https://ko-fi.com/novapowers)
-[![Built with](https://img.shields.io/badge/built%20with-gbarecomp-8A2BE2?style=flat-square)](https://github.com/mstan/gbarecomp)
+</div>
 
-| | |
+## Overview
+
+An unofficial Android adaptation of Dragon Ball Z: Buu's Fury for Game Boy Advance, based on the static recompilation projects developed by Matthew Stanley and NovaPowers.
+
+Unlike conventional GBA emulation, the original game code is statically recompiled for native execution.
+
+This Android adaptation introduces native dual-screen functionality, allowing gameplay on the upper display while a persistent touchscreen interface provides additional game information on the lower display.
+
+## Dual-Screen Experience
+
+![AYN Thor Dual-Screen](docs/screenshots/dual-screen-showcase.png)
+
+The AYN Thor Max has been physically tested with the game running on its upper display and the companion interface on its lower display.
+
+### Widescreen Gameplay
+
+![Widescreen Gameplay](docs/screenshots/gameplay-widescreen.png)
+
+Adaptive widescreen reveals additional game-world content without simply stretching the original GBA image.
+
+### Touchscreen Companion Interface
+
+The secondary display provides six dedicated sections:
+
+| Character Status | Inventory |
 |---|---|
-| **Players** | 1 (single-player) |
-| **Platform** | Windows x64 |
-| **Engine** | Game Boy Advance (gbarecomp) |
-| **Genre** | Action RPG |
-| **Version** | v0.0.6-WIP (preview) |
+| ![Status](docs/screenshots/menu-status.png) | ![Inventory](docs/screenshots/menu-inventory.png) |
+| Equipment | Skills |
+| ![Equipment](docs/screenshots/menu-equipment.png) | ![Skills](docs/screenshots/menu-skills.png) |
+| Journal | Map |
+| ![Journal](docs/screenshots/menu-journal.png) | ![Map](docs/screenshots/menu-map.png) |
 
-Copyright (c) 2026 **NovaPowers**. Released under the PolyForm Noncommercial
-License 1.0.0 (see [`LICENSE`](LICENSE)).
+All screenshots were captured from the real Android application running on an AYN Thor.
 
-**[⬇ Latest build](../../releases)** · [What's new](#whats-new) ·
-[Quick start](#quick-start) · [Widescreen mod](#widescreen-mod) ·
-[Building from source](#building-from-source)
+## Features
 
----
+- Native Android ARM64 integration using GBARecomp.
+- Real dual-screen support through Android Presentation.
+- Adaptive widescreen gameplay.
+- Persistent touchscreen companion interface.
+- Live character statistics and inventory information.
+- Equipment and skill information.
+- Quest journal.
+- Scouter-inspired map interface.
+- Automatic English and Spanish interface localization based on ROM identity.
+- Integrated ROM and GBA BIOS importer.
+- Physical gamepad support.
+- Android-specific runtime and display handling.
 
-## What's new
+This is an experimental project. Some features and gameplay interactions are still undergoing testing and refinement.
 
-- **Boot matches the real BIOS handoff**: the fast boot now leaves `DISPCNT`
-  forced-blank and `POSTFLG` set exactly like the real BIOS (and mGBA), and the
-  PPU starts on mGBA's skipBios phase.
-- **Cheat multipliers**: EXP/Zenie ×2/×4, damage taken ×2/×0.5 and a slow XP
-  curve, grouped under *Cheats - Multipliers* and *Cheats - Difficulty* (all off
-  by default).
-- **Faster boot**: the startup logos fast-forward to the title screen (~1 s
-  instead of ~8), with the guest frame sequence untouched.
-- **Faster margins**: the adaptive widescreen render now resolves each field tile
-  once per frame (about +8 % at 480 px), pixel-identical to before.
-- **Start + Select guard**: A + B + Start + Select still soft-resets the game
-  (the BIOS reset passes through) while Start + Select opens the in-game menu.
-- **Opt-in audio smoothing** (`GBARECOMP_AUDIO_SMOOTH=1`).
+## Supported ROMs
 
-## Highlights
+Only specifically reviewed ROM identities are accepted.
 
-- **Adaptive widescreen** (optional mod): reveals real authored world in the
-  margins as the window widens, without stretching the image or touching the
-  camera.
-- **Autosave with recovery**: takes a snapshot every 30 s and resumes the game
-  after an unexpected close.
-- **In-game tools**: save states, fast-forward and rewind.
-- **In-game cheats**: CodeBreaker Advance presets (money, HP/EP, EXP, fusion
-  time, Dragon Balls) plus gain/loss multipliers, all off by default.
-- **Save editor**: read and change live values (money, HP/EP and their maxima,
-  EXP, Attack and Dragon Balls).
-- **In-game menu with Start + Select**: opens the tools, cheats and editor
-  without leaving the game.
-- **Fast boot**: skips the BIOS intro (reversible).
-- **Five screen colour profiles**: Raw, Unlit, Frontlit, Backlit and Classic.
-- **EN/ES launcher** with Spanish box art when the translation is detected.
-- **Fixed audio** (the original mixer's constant crackle) and multiplayer audio
-  at the mixer's real rate.
+| ROM | Language | Size |
+|---|---|---|
+| USA GoodTools / RetroAchievements | English | 8,388,608 bytes |
+| USA No-Intro | English | 8,388,608 bytes |
+| Reviewed Spanish translation | Spanish | 10,514,228 bytes |
 
-## What this fork adds
+### Supported SHA-1 Hashes
 
-| Change | Detail |
-|---|---|
-| **Fast boot** | Skips the BIOS intro by default (presentation only; the real BIOS still runs for IRQ/SWI). Reversible with `--no-bios-skip-intro`. |
-| **Faster boot** | The startup logos run under Assist Tools fast-forward until the title screen, so the frame sequence is untouched. `GBARECOMP_TURBO_BOOT` overrides the frame count. |
-| **Faithful boot state** | The BIOS handoff now leaves `DISPCNT` forced-blank (`0x0080`) and `POSTFLG=1`, and the PPU starts on mGBA's skipBios phase (`set_scanline_phase`), matching the real BIOS and the oracle. |
-| **Autosave + recovery** | Periodic snapshot next to the ROM; if the process dies without a clean exit, the next launch resumes. A clean exit does not resume. |
-| **In-menu tools** | States (F1–F9 / Shift+F1–F9), fast-forward and 8 s rewind, toggled from the in-game menu. |
-| **Fixed audio** | The engine mixes at 32,768 Hz but was played back as if it were 65,536; the buffer was always empty and it sounded "poppy". Now it is clean. Optional one-pole smoothing: `GBARECOMP_AUDIO_SMOOTH=1`. |
-| **Overworld crash fix** | A bridge runaway in the starting area was resolved by widening static coverage. |
-| **Wider static coverage** | The starting overworld validates **FULLY STATIC** (0 misses, 0 interpreted). |
-| **Three equivalent dumps** | GoodTools/RA (`f1c4…`), No-Intro (`e657…`) and the Spanish translation (`ee667…`); one generated image serves them all. |
-| **EN/ES launcher** | Language selector when the Spanish dump is present, region label "USA + Mod SPA" and Spanish box art. |
-| **Cheats (in-game)** | Generic **CodeBreaker Advance** engine with its own menu, this cart's presets and a *Walk Anywhere* test tool; grouped into sections, all off by default. |
-| **Cheat multipliers** | Watch a live value and scale every guest change: EXP ×2/×4, Zenie ×2/×4, damage taken ×2/×0.5 and a slow XP curve. Gains, losses and divisors are configured independently, and each preset seeds itself when enabled. |
-| **Save editor** | **Editor** section in the in-game menu: reads and writes live RAM values (money, HP/EP, EXP, Attack, Dragon Balls). |
-| **Start + Select** | Host shortcut that opens the in-game menu (tools, cheats, editor) without leaking into the game; A + B + Start + Select still soft-resets. Shown in the launcher. |
-| **Multiplayer audio** | The link-cable mode assumed a fixed 65,536 Hz; it now publishes the mixer's real rate, just like single-player. |
-| **Synced fork** | Up to date with `mstan/DragonBallZBuusFuryRecomp`, including its portable ZIP writer (`/` entry names for Linux/Steam Deck). |
+**USA GoodTools / RetroAchievements**
 
-## Status
+`f1c4b07554d2a3b1ad2f325307051e775ce68087`
 
-**Experimental** preview. The USA version boots, plays its attract sequence and
-reaches gameplay; strict validation covers attract, gameplay and traversal with
-no interpreted instructions and no dispatch misses. The whole game has not been
-tested exhaustively, so **back up your saves**.
+**USA No-Intro**
 
-## Quick start
+`e65738e9d67688309f09811a54f495523ec9aada`
 
-1. Download the Windows ZIP from the **Releases** tab and extract it.
-2. Run `DragonBallZBuusFuryRecomp.exe`.
-3. In the launcher, pick your ROM (USA, No-Intro or the Spanish translation) and
-   the retail GBA BIOS.
-4. Adjust display, audio, controls and mods, then press **Play**.
+**Spanish translation**
 
-If the Spanish translation is present, an **EN/ES** selector appears next to
-*Mods*. The launcher remembers valid files; tick **Skip launcher on boot** to go
-straight to the game on later launches.
+`ee667f656f6c3a128b9d59c657b3686e58b23eb5`
 
-## Widescreen mod
+The installer verifies the exact ROM hash and file size. Unknown or modified ROMs are rejected.
 
-**Buu's Fury Adaptive Widescreen** is optional and **off by default**. As the
-window widens, the logical view grows from 240×160 up to 480×160, revealing real
-authored world in the margins (it is neither a stretch nor a crop), with field
-chunk streaming and expanded actor visibility. The faithful **240×160 image
-stays identical** with the mod off. Enable it on the launcher's **Mods** page.
+Recognition does not imply that every variant has been verified through a complete playthrough.
 
-## Controls and shortcuts
+## GBA BIOS
 
-| GBA control | Keyboard |
-|---|---|
-| D-Pad | Arrow keys |
-| A / B | Z / X |
-| Start | Enter |
-| Select | Backspace |
+An authentic 16 KiB Game Boy Advance BIOS is required.
 
-- **Shift+F1–F9**: save state · **F1–F9**: load state.
-- **Fast-forward** and **rewind**: from the in-game tools menu.
-- **Start + Select**: opens the in-game menu (tools, cheats and editor).
-- **Autosave**: automatic every 30 s while playing in a window.
+Required SHA-1:
 
-Controls are changed in the launcher.
+`300c20df6731a33952ded8c436f7f186d25d3492`
 
-## Building from source
+ROMs and BIOS files are not included.
 
-Windows requirements: CMake, Ninja, MSYS2 MinGW64 and SDL2.
+## Languages
 
-```powershell
-git clone --recurse-submodules `
-  https://github.com/novapowers0/DragonBallZBuusFuryRecomp.git
-cd DragonBallZBuusFuryRecomp
+The lower-screen interface automatically follows the recognized ROM language.
 
-cmake -S gbarecomp -B gbarecomp/build -G Ninja
-cmake --build gbarecomp/build --target gba_recompile
-pwsh tools/regen.ps1
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target DragonBallZBuusFuryRecomp
+- English: supported USA cartridges.
+- Spanish: reviewed Spanish translation.
+- French and Brazilian Portuguese: interface catalogs exist, but corresponding ROMs have not been admitted for execution.
+
+There is no manual language selector. The selected cartridge determines the original game's language.
+
+## Installation
+
+Once a public APK release becomes available:
+
+1. Download the Android APK from GitHub Releases.
+2. Install the APK on your compatible Android device.
+3. Launch the application.
+4. Select and import your own supported Buu's Fury ROM.
+5. Import your authentic GBA BIOS.
+6. Allow the installer to validate both files.
+7. Start the game.
+
+The installer validates ROM identity before accepting an import. Failed ROM validation preserves the previously installed ROM.
+
+Back up your save files before switching ROM variants.
+
+## Building from Source
+
+### Requirements
+
+- Linux development environment
+- Java 17
+- Android SDK 35
+- Android NDK 27.1.12297006
+- Gradle 8.7
+- Android Gradle Plugin 8.6.1
+- CMake and Ninja
+- User-supplied, hash-verified ROM and GBA BIOS
+- Locally generated recompilation and BIOS dispatch sources
+
+### Clone
+
+```bash
+git clone --recurse-submodules https://github.com/erpiopio/BuusFury-Android.git
+cd BuusFury-Android
 ```
 
-Generation requires the supported ROM revision and a retail GBA BIOS; their
-identities and local paths are in [`baserom.md`](baserom.md) and
-[`game.toml`](game.toml). ROM-derived code, copyrighted inputs, saves and build
-output stay **local and are never uploaded**.
+### Build
 
-> **Spanish box art**: the release exe embeds it. In a source checkout,
-> `gbarecomp/src/runtime/cover_embedded.h` is not distributed (copyrighted art);
-> the launcher still builds without it.
+After preparing the required generated sources from your own ROM and BIOS:
 
-## Verification
+```bash
+./android/build.sh
+```
 
-`tools/regression_check.ps1` enables the widescreen mod, runs the game headless
-at 480 px and at 240 px from the same states, and checks that the central strip
-of the wide image matches the native one (the enhancement must be an exact
-superset). It also requires the frame to actually widen. Result for the release
-executable: **57/57 scenes at 0.0000 %**.
+Development APK output:
 
-## Legal
+`android/app/build/outputs/apk/debug/app-debug.apk`
 
-Unofficial, non-commercial research and preservation project. Not affiliated
-with or endorsed by Nintendo, Atari, Webfoot Technologies, Shueisha, Toei
-Animation or any Dragon Ball rights holder. Dragon Ball and the related names,
-characters, art and game data are trademarks or copyright of their respective
-owners.
+A clean checkout intentionally excludes copyrighted ROM-derived generated code, original game assets and BIOS material.
 
-**No** ROM, Nintendo GBA BIOS, save or extracted game data is distributed. The
-launcher box art is included for identification purposes. See
-[`baserom.md`](baserom.md) for the checksums and how to supply your own legal
-files.
-
-## Support the project
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/novapowers)
-
-If you enjoy my open-source work on static recompilation and software
-preservation, consider supporting it. The game and all of its content stay free;
-supporting is completely optional.
-
-## License
-
-The original code of this project is distributed under the
-[PolyForm Noncommercial License 1.0.0](LICENSE) (mstan's authorship for the
-original project; this fork keeps it). NovaPowers' contributions are released
-under that same license.
+See [Android development documentation](docs/android-thor.md) for additional build configuration and runtime details. Some historical sections describe early development stages and may not reflect the latest tested implementation.
 
 ## Credits
 
-- **Matthew Stanley (mstan)** — `gbarecomp` recompiler, `recomp-ui` launcher and
-  the original project structure.
-- **R.A.I.D. — Retro AI Development** — static-recompilation community.
-- **NovaPowers** — this fork: crash fix, wider coverage, three-dump support,
-  EN/ES launcher, audio fix, faithful boot, fast boot, autosave, in-game tools,
-  cheats and multipliers, save editor and the Adaptive Widescreen mod update.
+This project would not exist without the work of the original developers.
 
----
+- **Matthew Stanley (mstan):** Original project, GBARecomp and static recompilation technology.
+- **NovaPowers:** Buu's Fury Recomp fork, compatibility improvements, widescreen support and runtime development.
+- **R.A.I.D. — Retro AI Development:** Static recompilation community.
+- **erpiopio:** Android ARM64 adaptation, AYN Thor dual-screen integration, touchscreen companion interface and related runtime modifications.
 
-Part of the **R.A.I.D. — Retro AI Development** community.
+### Original Projects
+
+- [NovaPowers — Dragon Ball Z: Buu's Fury Recomp](https://github.com/novapowers0/DragonBallZBuusFuryRecomp)
+- [Matthew Stanley — GBARecomp](https://github.com/mstan/gbarecomp)
+- [AYN Thor GBARecomp Fork](https://github.com/erpiopio/gbarecomp-thor)
+
+The original project's README is preserved in [Upstream Documentation](docs/README-upstream.md).
+
+## License
+
+The Buu's Fury Recomp project and GBARecomp-derived components are distributed under the PolyForm Noncommercial License 1.0.0.
+
+Recomp UI is licensed under the MIT License.
+
+Original copyright and attribution notices are retained.
+
+See [LICENSE](LICENSE) for the applicable terms.
+
+## Legal Disclaimer
+
+This is an unofficial, non-commercial fan development and preservation project.
+
+It is not affiliated with Nintendo, Atari, Webfoot Technologies, Toei Animation, Shueisha or any Dragon Ball rights holder.
+
+Dragon Ball Z, Buu's Fury and all associated characters, artwork, audio and original game data belong to their respective owners.
+
+No original game ROM, GBA BIOS or ROM-derived generated code is provided by this repository. Users must supply their own legally obtained files.
+
+Compiled public releases must be reviewed to ensure that unauthorized copyrighted game assets are not included.

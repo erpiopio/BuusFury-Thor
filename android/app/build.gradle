@@ -1,0 +1,146 @@
+plugins { id 'com.android.application' }
+
+def gameRoot = rootProject.projectDir.parentFile
+ext.gbaGame = [
+    applicationId: 'org.novapowers.buusfury.thor',
+    versionCode: 1,
+    versionName: '0.1.0-dev',
+    title: "Buu's Fury Thor",
+    romLabel: 'USA (EN) o traduccion SPA verificada (ES)',
+    romSha1: ['f1c4b07554d2a3b1ad2f325307051e775ce68087',
+              'e65738e9d67688309f09811a54f495523ec9aada',
+              'ee667f656f6c3a128b9d59c657b3686e58b23eb5'],
+    romSize: 8388608,
+    romSizes: [8388608, 10514228],
+    romFile: 'dragon_ball_z_buus_fury_usa.gba',
+    variant: 'buus-fury',
+    gameToml: file('src/main/assets-source/game.toml'),
+    gameRoot: gameRoot,
+    engineRoot: new File(gameRoot, 'gbarecomp'),
+    biosRequired: true,
+    orientation: 'landscape',
+    payloadVersion: 'thor-1',
+    setupNote: 'Importa tu ROM EN o SPA: el idioma corresponde al archivo importado. ' +
+               'El panel inferior no cambia el idioma de la ROM.',
+    nativeJobs: 1,
+    debugAbis: ['arm64-v8a'],
+    releaseAbis: ['arm64-v8a'],
+    cmakeArguments: ['-DGBAGAME_RECOMP_UI=OFF', '-DGBARECOMP_RUNTIME_UI_ROOT=',
+                     '-DGBARECOMP_SELFHEAL_RECOMPILE_DEFAULT=OFF'],
+    payloadDirs: [[from: new File(gameRoot, 'mods/preloaded'), into: 'mods']],
+]
+apply from: new File(gameRoot, 'gbarecomp/platform/android/gbarecomp-app.gradle')
+
+// Local update builds can explicitly reuse the device's existing development key.
+// The key stays outside the project and is never packaged.
+def thorDebugKeystore = providers.gradleProperty('thorDebugKeystore').orNull
+if (thorDebugKeystore) {
+    android.signingConfigs.debug {
+        storeFile file(thorDebugKeystore)
+        storePassword 'android'
+        keyAlias 'androiddebugkey'
+        keyPassword 'android'
+    }
+}
+
+// Reuse the shared SDL/import shell, then add this game's display controller.
+def thorMenuAssets = layout.buildDirectory.dir('generated/thor-menu-assets')
+def stageThorMenuAssets = tasks.register('stageThorMenuAssets', Sync) {
+    from(file('src/main/assets')) {
+        exclude 'plantilla_habilidades.png', 'plantilla_diario.png',
+                'plantilla_inventario.png', 'equipo_ref/equipo_plantilla.png',
+                'estado-plantilla.png', 'thor_maps/**'
+    }
+    into(thorMenuAssets)
+}
+tasks.named('preBuild').configure { dependsOn(stageThorMenuAssets) }
+android {
+    defaultConfig {
+        testInstrumentationRunner 'org.novapowers.buusfury.thor.ThorLayoutInstrumentation'
+    }
+    sourceSets.main.java.srcDir file('src/main/java')
+    // Stage a filtered tree: AGP's asset merger does not honor source-set excludes.
+    // The original text-bearing templates remain locally available as references.
+    sourceSets.debug.assets.srcDirs = [thorMenuAssets]
+    sourceSets.main.manifest.srcFile file('src/main/AndroidManifest.xml')
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+// Explicit local iteration mode: package the already tested native build.
+// Normal builds continue to compile CMake; never silently select stale libraries.
+def prebuiltProperty = providers.gradleProperty('thorPrebuiltNativeDir').orNull
+if (prebuiltProperty) {
+    def prebuilt = file(prebuiltProperty)
+    android.externalNativeBuild.cmake.path = null
+    android.sourceSets.main.jniLibs.srcDir prebuilt
+    tasks.register('verifyThorPrebuiltNative') {
+        doLast {
+            def abi = new File(prebuilt, 'arm64-v8a')
+            def required = ['libmain.so', 'libSDL2.so', 'libc++_shared.so']
+            required.each { name ->
+                def library = new File(abi, name)
+                if (!library.isFile() || library.length() == 0)
+                    throw new GradleException("Missing ARM64 native library: ${library}")
+            }
+            if (!prebuilt.isDirectory() || prebuilt.listFiles().any {
+                    it.isDirectory() && it.name != 'arm64-v8a' })
+                throw new GradleException('Thor prebuilt mode accepts only an arm64-v8a directory')
+            if (providers.gradleProperty('gbaAbis').orNull &&
+                    providers.gradleProperty('gbaAbis').get() != 'arm64-v8a')
+                throw new GradleException('Thor prebuilt mode requires -PgbaAbis=arm64-v8a')
+        }
+    }
+    tasks.named('preBuild').configure { dependsOn('verifyThorPrebuiltNative') }
+}
+
+// These narrow lint exceptions rely on the exact audited SDL integration.
+// Fail closed on an SDL update, newly requested permission, or capture use.
+android.lint.lintConfig = file('lint.xml')
+def pinnedSdlJava = new File(gameRoot,
+    'gbarecomp/platform/android/third_party/SDL/android-project/app/src/main/java/org/libsdl/app')
+def auditedSdl = [
+    'SDLActivity.java': '12224e9eb8e659dde6831ab260fb3eeefed74fca72baeef1182402d74cb37fd5',
+    'HIDDeviceManager.java': '7f16fa997af31b70dabf136f5d6430f8f00437bfb0a6bc2457e9046e2fe34325',
+    'HIDDeviceBLESteamController.java': '78a07450afa0d7078496a219a32b4bce5c00671317bc228333e9bff5e3da500d',
+    'SDLAudioManager.java': '27db11b8436dc4b8393241120ce9107b081203a27fa39c36efd42a4a7ec9af9d',
+]
+def verifySdlCompatibility = tasks.register('verifySdlCompatibility') {
+    doLast {
+        auditedSdl.each { name, expected ->
+            def source = new File(pinnedSdlJava, name)
+            def actual = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(source.bytes).encodeHex().toString()
+            if (actual != expected)
+                throw new GradleException("SDL ${name} changed: review compatibility and lint exceptions")
+        }
+        def activity = new File(pinnedSdlJava, 'SDLActivity.java').text
+        def manager = new File(pinnedSdlJava, 'HIDDeviceManager.java').text
+        if (!activity.contains('HIDDeviceManager.acquire(this)') ||
+                !manager.contains('mContext = context;') ||
+                !manager.contains('filter.addAction(HIDDeviceManager.ACTION_USB_PERMISSION);') ||
+                !manager.contains('mContext.registerReceiver(mUsbBroadcast, filter);') ||
+                !manager.contains('android.Manifest.permission.BLUETOOTH_CONNECT') ||
+                !manager.contains('android.Manifest.permission.BLUETOOTH'))
+            throw new GradleException('SDL Context/USB/Bluetooth compatibility assumptions changed')
+        def manifest = file('src/main/AndroidManifest.xml').text
+        if (manifest.contains('android.permission.BLUETOOTH') ||
+                manifest.contains('android.permission.RECORD_AUDIO'))
+            throw new GradleException('New optional permission requires review of scoped SDL lint exceptions')
+        def nativeAudio = new File(gameRoot, 'gbarecomp/src/runtime/host_window.cpp').text
+        if (nativeAudio.count('SDL_OpenAudioDevice(') != 1 ||
+                !nativeAudio.contains('SDL_OpenAudioDevice(audio_device_name, /*iscapture=*/0,'))
+            throw new GradleException('Native audio use changed: review the optional capture lint exception')
+    }
+}
+tasks.named('preBuild').configure { dependsOn(verifySdlCompatibility) }
+tasks.matching { it.name in ['lint', 'lintDebug', 'lintRelease'] }.configureEach {
+    dependsOn(verifySdlCompatibility)
+}
+
+// THOR_AUTO_MAP_PAYLOAD_V1: empaquetar mapas generados localmente.
+tasks.named("stageGbarecompPayload", Sync).configure {
+    from(file("src/main/assets/thor_maps")) { into("payload/thor_maps") }
+}
