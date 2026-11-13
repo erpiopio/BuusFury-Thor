@@ -140,7 +140,7 @@ tasks.matching { it.name in ['lint', 'lintDebug', 'lintRelease'] }.configureEach
     dependsOn(verifySdlCompatibility)
 }
 
-// THOR_AUTO_MAP_PAYLOAD_V1: empaquetar mapas generados localmente.
-tasks.named("stageGbarecompPayload", Sync).configure {
-    from(file("src/main/assets/thor_maps")) { into("payload/thor_maps") }
-}
+
+
+// Build the ROM-derived Thor map extractor alongside the game.
+android.defaultConfig.externalNativeBuild.cmake.targets.add('thor_maps')

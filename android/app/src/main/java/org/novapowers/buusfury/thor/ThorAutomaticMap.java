@@ -9,6 +9,10 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 
@@ -19,7 +23,7 @@ final class ThorAutomaticMap {
         final int worldWidth, worldHeight;
         Entry(String p, int w, int h) { png = p; worldWidth = w; worldHeight = h; }
     }
-    private final Context context;
+    private final File mapsDirectory;
     private final HashMap<Integer, Entry> entries = new HashMap<>();
     private final Paint paint = new Paint();
     private Bitmap bitmap;
@@ -29,9 +33,25 @@ final class ThorAutomaticMap {
     private boolean positionValid;
 
     ThorAutomaticMap(Context ctx) {
-        context = ctx;
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(
-                ctx.getAssets().open("payload/thor_maps/index.csv")))) {
+        File directory = null;
+        try {
+            if (!ThorRomIdentity.verifyActive(
+                    ctx, ThorRomIdentity.activeFile(ctx))) {
+                throw new IOException("ROM no verificada");
+            }
+
+            String sha1 = ThorRomIdentity.activeSha1();
+
+            if (!ThorMapExtractor.mapsReady(ctx, sha1)) {
+                throw new IOException("Mapas privados no preparados");
+            }
+
+            directory = ThorMapExtractor.mapsDirectory(ctx, sha1);
+
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(
+                        new FileInputStream(new File(directory, "index.csv")),
+                        StandardCharsets.UTF_8))) {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] f = line.split(",");
@@ -39,9 +59,13 @@ final class ThorAutomaticMap {
                 entries.put(Integer.parseInt(f[0], 16),
                     new Entry(f[1], Integer.parseInt(f[2]), Integer.parseInt(f[3])));
             }
+            }
         } catch (Exception e) {
+            entries.clear();
+            directory = null;
             android.util.Log.e("THOR_AUTO_MAP", "No se pudo cargar el índice", e);
         }
+        mapsDirectory = directory;
         paint.setAntiAlias(false);
         paint.setFilterBitmap(false);
     }
@@ -58,7 +82,7 @@ final class ThorAutomaticMap {
         current = entries.get(next);
         if (bitmap != null) { bitmap.recycle(); bitmap = null; }
         if (current == null) return;
-        try (java.io.InputStream is = context.getAssets().open("payload/thor_maps/" + current.png)) {
+        try (java.io.InputStream is = new FileInputStream(new File(mapsDirectory, current.png))) {
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inScaled = false;
             bitmap = BitmapFactory.decodeStream(is, null, options);

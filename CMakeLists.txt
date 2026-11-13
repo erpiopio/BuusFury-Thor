@@ -141,3 +141,35 @@ elseif(MINGW OR WIN32)
     target_link_options(
         ${BUUS_FURY_TARGET} PRIVATE -Wl,--stack,16777216)
 endif()
+
+# Thor map generator: reconstruct lower-screen maps from the imported ROM.
+# Built separately from the game runtime and only on Android.
+if(ANDROID)
+    set(THOR_MAPS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/src/thor_maps")
+
+    add_library(thor_maps SHARED
+        "${THOR_MAPS_ROOT}/thor_maps_jni.cpp"
+        "${THOR_MAPS_ROOT}/dragonbytez/src/analysis.cpp"
+        "${THOR_MAPS_ROOT}/dragonbytez/src/compression.cpp"
+        "${THOR_MAPS_ROOT}/dragonbytez/src/png.cpp"
+        "${THOR_MAPS_ROOT}/dragonbytez/src/rom.cpp"
+    )
+
+    target_include_directories(thor_maps PRIVATE
+        "${THOR_MAPS_ROOT}/dragonbytez/include"
+    )
+
+    target_compile_features(thor_maps PRIVATE cxx_std_17)
+
+    target_compile_options(thor_maps PRIVATE
+        -O2
+        -fvisibility=hidden
+        -ffunction-sections
+        -fdata-sections
+    )
+
+    target_link_options(thor_maps PRIVATE
+        "-Wl,--gc-sections"
+        "-Wl,--no-undefined"
+    )
+endif()
