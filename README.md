@@ -165,6 +165,16 @@ A clean checkout intentionally excludes copyrighted ROM-derived generated code, 
 
 See [Android development documentation](docs/android-thor.md) for additional build configuration and runtime details. Some historical sections describe early development stages and may not reflect the latest tested implementation.
 
+## ☕ Support the Project
+
+If you enjoy **Buu's Fury Thor** and want to support the development of **Dragon Ball Z: Legacy Trilogy**, you can buy me a coffee!
+
+[☕ **Buy Me a Coffee — Support erpiopio**](https://buymeacoffee.com/erpiopio)
+
+Your support helps me continue working on the upcoming **Legacy of Goku II** and **Legacy of Goku I** Android adaptations.
+
+Donations are completely optional. Thank you for your support! 🐉
+
 ## Credits
 
 This project would not exist without the work of the original developers.
