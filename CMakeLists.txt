@@ -149,6 +149,8 @@ if(ANDROID)
 
     add_library(thor_maps SHARED
         "${THOR_MAPS_ROOT}/thor_maps_jni.cpp"
+        "${THOR_MAPS_ROOT}/thor_equipment_jni.cpp"
+        "${THOR_MAPS_ROOT}/thor_inventory_jni.cpp"
         "${THOR_MAPS_ROOT}/dragonbytez/src/analysis.cpp"
         "${THOR_MAPS_ROOT}/dragonbytez/src/compression.cpp"
         "${THOR_MAPS_ROOT}/dragonbytez/src/png.cpp"

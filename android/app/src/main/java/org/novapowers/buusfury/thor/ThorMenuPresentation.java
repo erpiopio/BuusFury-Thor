@@ -205,7 +205,8 @@ final class ThorMenuPresentation extends Presentation {
                         android.graphics.BitmapFactory.Options opciones =
                             new android.graphics.BitmapFactory.Options();
                         opciones.inScaled = false; // pixel art 16x16 sin suavizado
-                        try (java.io.InputStream grafico = context.getAssets().open(
+                        try (java.io.InputStream grafico = ThorInventoryExtractor.open(
+                                context, ThorRomIdentity.activeSha1(),
                                 objeto.getString("icono"))) {
                             Bitmap bitmap = BitmapFactory.decodeStream(grafico, null, opciones);
                             if (bitmap == null)
@@ -267,7 +268,12 @@ final class ThorMenuPresentation extends Presentation {
         private void cargarCatalogoEquipo(android.content.Context context) {
             for (int i = 0; i < equipoIconos.length; i++) {
                 String nombre = String.format(java.util.Locale.US, "thor_equipment_%03d.png", i);
-                try (java.io.InputStream entrada = context.getAssets().open(nombre)) {
+                try (java.io.InputStream entrada =
+                        ThorEquipmentExtractor.applies(ThorRomIdentity.activeSha1())
+                        ? new java.io.FileInputStream(
+                            ThorEquipmentExtractor.icon(
+                                context, ThorRomIdentity.activeSha1(), nombre))
+                        : context.getAssets().open(nombre)) {
                     android.graphics.BitmapFactory.Options opciones =
                         new android.graphics.BitmapFactory.Options();
                     opciones.inScaled = false;
@@ -1054,7 +1060,9 @@ final class ThorMenuPresentation extends Presentation {
                 }
 
                 try (java.io.InputStream in =
-                        context.getAssets().open("thor_portrait_" + i + ".png")) {
+                        ThorPortraitExtractor.open(
+                            context, ThorRomIdentity.activeSha1(),
+                            "thor_portrait_" + i + ".png")) {
                     retratos[i] = BitmapFactory.decodeStream(in);
                 } catch (java.io.IOException ignored) {
                     // Gogeta todavía no tiene retrato identificado.
@@ -1102,8 +1110,7 @@ final class ThorMenuPresentation extends Presentation {
 
                 for (int id = 1; id < 24; id++) {
                     try (java.io.InputStream imagen =
-                            context.getAssets().open(
-                                "thor_skill_" + id + ".png")) {
+                            ThorSkillsExtractor.open(context, "thor_skill_" + id + ".png")) {
                         iconosTecnicas[id] =
                             BitmapFactory.decodeStream(imagen);
                     }

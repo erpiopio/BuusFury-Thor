@@ -9,7 +9,6 @@ import java.util.Locale;
 /** Reviewed cartridge identities. Language recognition never implies compatibility. */
 final class ThorRomVariant {
     static final String EN_GOODTOOLS = "f1c4b07554d2a3b1ad2f325307051e775ce68087";
-    static final String EN_NOINTRO = "e65738e9d67688309f09811a54f495523ec9aada";
     static final String ES_REVIEWED = "ee667f656f6c3a128b9d59c657b3686e58b23eb5";
 
     final String sha1;
@@ -26,7 +25,7 @@ final class ThorRomVariant {
 
     static ThorRomVariant identify(String sha1, long size) {
         String normalized = sha1 == null ? "" : sha1.toLowerCase(Locale.ROOT);
-        if (EN_GOODTOOLS.equals(normalized) || EN_NOINTRO.equals(normalized))
+        if (EN_GOODTOOLS.equals(normalized))
             return new ThorRomVariant(normalized, size, "en", size == 8388608L);
         if (ES_REVIEWED.equals(normalized))
             return new ThorRomVariant(normalized, size, "es", size == 10514228L);

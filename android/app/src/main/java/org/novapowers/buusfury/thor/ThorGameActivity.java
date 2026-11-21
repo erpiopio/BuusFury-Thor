@@ -51,6 +51,13 @@ public final class ThorGameActivity extends GbaGameActivity
         if (!ThorRomIdentity.verifyActive(this, ThorRomIdentity.activeFile(this)))
             throw new IOException("Unverified ROM: return to setup and import a reviewed EN/ES variant.");
         loadedRomSha1 = ThorRomIdentity.activeSha1();
+        ThorSkillsExtractor.prepare(
+            this, ThorRomIdentity.activeFile(this), loadedRomSha1);
+        // Preparar los iconos nuevos al arrancar, incluso tras actualizar.
+        ThorInventoryExtractor.prepare(
+            this, ThorRomIdentity.activeFile(this), loadedRomSha1);
+        ThorPortraitExtractor.prepare(
+            this, ThorRomIdentity.activeFile(this), loadedRomSha1);
     }
 
     @Override

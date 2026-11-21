@@ -13,7 +13,10 @@ public final class ThorSetupActivity extends GbaSetupActivity {
     @Override
     protected boolean isInstalledRomReady(File rom, GbaGameConfig game) {
         if (!ThorRomIdentity.verifyActive(this, rom)) return false;
-        return ThorMapExtractor.mapsReady(this, ThorRomIdentity.activeSha1());
+        return ThorMapExtractor.mapsReady(this, ThorRomIdentity.activeSha1())
+            && ThorEquipmentExtractor.ready(this, ThorRomIdentity.activeSha1())
+            && ThorInventoryExtractor.ready(this, ThorRomIdentity.activeSha1())
+            && ThorPortraitExtractor.ready(this, ThorRomIdentity.activeSha1());
     }
 
     @Override
@@ -25,7 +28,10 @@ public final class ThorSetupActivity extends GbaSetupActivity {
     protected boolean needsInstalledRomPreparation(File rom) {
         if (!ThorRomIdentity.verifyActive(this, rom)) return false;
         return !ThorMapExtractor.mapsReady(
-            this, ThorRomIdentity.activeSha1());
+            this, ThorRomIdentity.activeSha1())
+            || !ThorEquipmentExtractor.ready(this, ThorRomIdentity.activeSha1())
+            || !ThorInventoryExtractor.ready(this, ThorRomIdentity.activeSha1())
+            || !ThorPortraitExtractor.ready(this, ThorRomIdentity.activeSha1());
     }
 
     @Override
@@ -36,12 +42,21 @@ public final class ThorSetupActivity extends GbaSetupActivity {
 
         ThorMapExtractor.prepareMaps(
             this, rom, ThorRomIdentity.activeSha1());
+        ThorEquipmentExtractor.prepare(
+            this, rom, ThorRomIdentity.activeSha1());
+        ThorInventoryExtractor.prepare(
+            this, rom, ThorRomIdentity.activeSha1());
+        ThorPortraitExtractor.prepare(
+            this, rom, ThorRomIdentity.activeSha1());
     }
 
     @Override
     protected void prepareImportedRom(File temporary, String sha1, long size)
             throws IOException {
         ThorMapExtractor.prepareMaps(this, temporary, sha1);
+        ThorEquipmentExtractor.prepare(this, temporary, sha1);
+        ThorInventoryExtractor.prepare(this, temporary, sha1);
+        ThorPortraitExtractor.prepare(this, temporary, sha1);
     }
 
     @Override
