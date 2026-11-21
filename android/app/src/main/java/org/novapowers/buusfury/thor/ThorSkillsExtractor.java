@@ -10,6 +10,15 @@ final class ThorSkillsExtractor {
     private static final String SPANISH =
         "ee667f656f6c3a128b9d59c657b3686e58b23eb5";
 
+    private static final String GOODTOOLS =
+        "f1c4b07554d2a3b1ad2f325307051e775ce68087";
+
+    private static boolean supported(String sha) {
+        return sha != null &&
+            (SPANISH.equalsIgnoreCase(sha) ||
+             GOODTOOLS.equalsIgnoreCase(sha));
+    }
+
     private ThorSkillsExtractor() {}
 
     private static File directory(Context ctx, String sha) {
@@ -21,8 +30,8 @@ final class ThorSkillsExtractor {
     }
 
     static boolean ready(Context ctx, String sha) {
-        if (!SPANISH.equalsIgnoreCase(sha)) return false;
-        File dir = directory(ctx, SPANISH);
+        if (!supported(sha)) return false;
+        File dir = directory(ctx, sha.toLowerCase(Locale.ROOT));
         if (!new File(dir, ".ready").isFile()) return false;
 
         for (int i = 0; i < 24; i++)
@@ -51,14 +60,13 @@ final class ThorSkillsExtractor {
     static synchronized void prepare(
             Context ctx, File rom, String sha) throws IOException {
 
-        // Solo activar para la ROM española cuyos 48 PNG
-        // hemos verificado píxel por píxel.
-        if (!SPANISH.equalsIgnoreCase(sha)) return;
+        // Las 48 habilidades se han verificado en ambas ROM.
+        if (!supported(sha)) return;
         if (ready(ctx, sha)) return;
 
-        File destination = directory(ctx, SPANISH);
+        File destination = directory(ctx, sha.toLowerCase(Locale.ROOT));
         File parent = destination.getParentFile();
-        File stage = new File(parent, SPANISH + ".staging");
+        File stage = new File(parent, sha.toLowerCase(Locale.ROOT) + ".staging");
 
         if (!parent.isDirectory() && !parent.mkdirs())
             throw new IOException("No se puede crear thor_skills");
@@ -168,6 +176,6 @@ final class ThorSkillsExtractor {
                 "Habilidades no disponibles para esta ROM");
 
         return new FileInputStream(
-            new File(directory(ctx, SPANISH), name));
+            new File(directory(ctx, sha.toLowerCase(Locale.ROOT)), name));
     }
 }
